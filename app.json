@@ -1,13 +1,19 @@
 {
   "expo": {
-    "name": "expenso",
-    "slug": "expenso",
+    "name": "flux",
+    "slug": "flux",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "expenso",
+    "scheme": "flux",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true
     },
@@ -33,7 +39,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
