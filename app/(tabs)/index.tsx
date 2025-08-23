@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import NoteEditor from '@/components/NoteEditor';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -9,33 +11,27 @@ import { createNote, deleteNote, updateNote } from '@/store/notesSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks/index';
 import { Note } from '../../types/index';
 
-// Option 1: DD/MM/YYYY, HH:MM
-// new Date(note.updatedAt).toLocaleDateString('en-GB', {
-//   day: '2-digit', month: '2-digit', year: 'numeric',
-//   hour: '2-digit', minute: '2-digit', hour12: false
-// })
-// Result: "01/08/2025, 17:03"
-
-// Option 2: More readable
-// new Date(note.updatedAt).toLocaleDateString('en-US', {
-//   month: 'short', day: 'numeric', year: 'numeric',
-//   hour: '2-digit', minute: '2-digit', hour12: false
-// })
-// Result: "Aug 1, 2025, 17:03"
-
-// Option 3: Just date
-// new Date(note.updatedAt).toLocaleDateString('en-GB')
-// Result: "01/08/2025"
-
 export default function NotesScreen() {
   const notes = useAppSelector((state) => state.notes.notes);
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
 
-  console.log('Redux notes:', notes);
-  console.log('Number of notes:', notes.length);
+  //View state management
+  const [currentView, setCurrentView] = useState<'list' | 'editor'>('list');
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
 
-  //Show pop-up/alert
+  //View management functions
+  const openEditor = (note: Note) => {
+    setEditingNote(note);
+    setCurrentView('editor');
+  };
+
+  const closeEditor = () => {
+    setEditingNote(null);
+    setCurrentView('list');
+  };
+
+  //Note operations
   const handleAddNote = () => {
     Alert.prompt('New Note', 'Enter note title:', [
       { text: 'Cancel', style: 'cancel' },
@@ -43,7 +39,6 @@ export default function NotesScreen() {
         text: 'Create',
         onPress: async (title) => {
           if (title?.trim()) {
-            // Create note in database AND Redux
             await dispatch(
               createNote({
                 title: title.trim(),
@@ -56,31 +51,8 @@ export default function NotesScreen() {
     ]);
   };
 
-  // Add these functions inside your NotesScreen component (after the handleAddNote function)
-
   const handleEditNote = (note: Note) => {
-    Alert.prompt(
-      'Edit Note',
-      'Edit note title:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: (newTitle) => {
-            if (newTitle?.trim() && newTitle.trim() !== note.title) {
-              dispatch(
-                updateNote({
-                  id: note.id,
-                  updates: { title: newTitle.trim() },
-                }),
-              );
-            }
-          },
-        },
-      ],
-      'plain-text',
-      note.title, // Pre-fill with current title
-    );
+    openEditor(note);
   };
 
   const handleDeleteNote = (note: Note) => {
@@ -96,27 +68,22 @@ export default function NotesScreen() {
     ]);
   };
 
-  const renderNote = ({ item }: { item: Note }) => (
-    <ThemedView style={styles.noteCard}>
-      <ThemedText type="defaultSemiBold" style={styles.noteTitle}>
-        {item.title}
-      </ThemedText>
-      <ThemedText style={styles.notePreview}>
-        {item.content ? item.content.substring(0, 80) + '...' : 'No content yet'}
-      </ThemedText>
-      <ThemedText style={styles.noteDate}>
-        {new Date(item.updatedAt).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        })}
-      </ThemedText>
-    </ThemedView>
-  );
+  const handleSaveNote = (noteId: string, title: string, content: string) => {
+    dispatch(
+      updateNote({
+        id: noteId,
+        updates: { title, content },
+      }),
+    );
+    closeEditor();
+  };
 
+  //Render editor view
+  if (currentView === 'editor' && editingNote) {
+    return <NoteEditor note={editingNote} onSave={handleSaveNote} onCancel={closeEditor} />;
+  }
+
+  //Render list view (default)
   return (
     <>
       <ParallaxScrollView
@@ -144,40 +111,52 @@ export default function NotesScreen() {
           <ThemedView style={styles.stepContainer}>
             <ThemedText type="subtitle">Your Notes ({notes.length})</ThemedText>
             {notes.map((note) => (
-              <ThemedView key={note.id} style={styles.noteCard}>
-                <ThemedText type="defaultSemiBold" style={styles.noteTitle}>
-                  {note.title}
-                </ThemedText>
-                <ThemedText style={styles.notePreview}>
-                  {note.content ? note.content.substring(0, 100) + '...' : 'No content yet'}
-                </ThemedText>
-                <ThemedText style={styles.noteDate}>
-                  Updated{' '}
-                  {new Date(note.updatedAt).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
-                </ThemedText>
+              <TouchableOpacity
+                key={note.id}
+                style={styles.noteCard}
+                onPress={() => handleEditNote(note)}
+                activeOpacity={0.7}>
+                <ThemedView style={styles.noteCardContent}>
+                  <ThemedText type="defaultSemiBold" style={styles.noteTitle}>
+                    {note.title}
+                  </ThemedText>
+                  <ThemedText style={styles.notePreview}>
+                    {note.content ? note.content.substring(0, 100) + '...' : 'No content yet'}
+                  </ThemedText>
+                  <ThemedText style={styles.noteDate}>
+                    Updated{' '}
+                    {new Date(note.updatedAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    })}
+                  </ThemedText>
 
-                {/* Simple edit/delete buttons */}
-                <ThemedView style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => handleEditNote(note)}
-                    style={{ padding: 8, backgroundColor: '#007AFF', borderRadius: 4 }}>
-                    <ThemedText style={{ color: 'white', fontSize: 12 }}>Edit</ThemedText>
-                  </TouchableOpacity>
+                  {/* Action buttons */}
+                  <ThemedView style={styles.actionButtons}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent note opening
+                        handleEditNote(note);
+                      }}
+                      style={styles.editButton}>
+                      <ThemedText style={styles.editButtonText}>Edit</ThemedText>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    onPress={() => handleDeleteNote(note)}
-                    style={{ padding: 8, backgroundColor: '#FF3B30', borderRadius: 4 }}>
-                    <ThemedText style={{ color: 'white', fontSize: 12 }}>Delete</ThemedText>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent note opening
+                        handleDeleteNote(note);
+                      }}
+                      style={styles.deleteButton}>
+                      <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
+                    </TouchableOpacity>
+                  </ThemedView>
                 </ThemedView>
-              </ThemedView>
+              </TouchableOpacity>
             ))}
           </ThemedView>
         )}
@@ -221,9 +200,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   noteCard: {
-    padding: 16,
     marginVertical: 6,
     borderRadius: 12,
+    overflow: 'hidden',
+  },
+  noteCardContent: {
+    padding: 16,
     borderLeftWidth: 4,
     borderLeftColor: '#007AFF',
   },
@@ -239,6 +221,29 @@ const styles = StyleSheet.create({
   noteDate: {
     fontSize: 12,
     opacity: 0.6,
+    marginBottom: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editButton: {
+    padding: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 4,
+  },
+  editButtonText: {
+    color: 'white',
+    fontSize: 12,
+  },
+  deleteButton: {
+    padding: 8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 4,
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 12,
   },
   addButton: {
     position: 'absolute',
